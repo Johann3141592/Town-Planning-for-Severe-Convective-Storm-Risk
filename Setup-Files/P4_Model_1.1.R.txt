@@ -1,0 +1,169 @@
+# Script for assessing environmental risk
+# A highly simplified catastrophe model
+# Copyright 2021 - John Hillier
+
+#### [1] Input: Set the values of numerical variables & data file
+
+# Input file
+In_Buildings <- "./Buildings_FL_E_1.2.txt"
+
+# Numerical variables
+# Number of realisations (years) to simulate
+YEARS <- 23
+# Number of sides on dice 1 & 2 that control event size
+SIDES_d1 <- 9#8			
+SIDES_d2 <- 4#8
+# Location of the event
+# To fix the location, make the minimum and maximum values the same
+Y_min <- 3#9				
+Y_max <- 3#9
+X_min <- 7#1				
+X_max <- 12	
+
+#### [2] Output files: Create 
+
+# For the data produced
+dat1_out_f <- sprintf("Event_loss_out_1.txt")
+file.create(dat1_out_f)
+# For the settings used
+param_f <- sprintf("Parameters_1.txt")
+file.create(param_f)
+
+#### [3] Set up dataframes
+
+# For the location and size of the events
+Event_locn_df <- as.data.frame(matrix(nrow = YEARS, ncol = 12))
+names(Event_locn_df)[1] <- "Year"     # Year in the simulatin
+names(Event_locn_df)[2] <- "x"        # x location of the centre of the event
+names(Event_locn_df)[3] <- "y"        # y location of the centre of the event
+names(Event_locn_df)[4] <- "d1"       # roll of die 1
+names(Event_locn_df)[5] <- "d2"       # roll of die 2
+names(Event_locn_df)[6] <- "M"        # Magnitude of the event
+names(Event_locn_df)[7] <- "Dx"       # Range of event (centre to edge) x-dirn in squares
+names(Event_locn_df)[8] <- "Dy"       # Range of event (centre to edge) y-dirn in squares
+names(Event_locn_df)[9] <- "Lx"       # Leftmost x of the extent of the event
+names(Event_locn_df)[10] <- "Rx"      # Rightmost x of the extent of the event
+names(Event_locn_df)[11] <- "Ly"      # Lowest y of the extent of the event
+names(Event_locn_df)[12] <- "Uy"      # Upmost y of the extent of the event
+
+# By reading in the locations of the assets at risk
+In_Buildings_df <- read.csv(In_Buildings,header=F,na.strings=-999.9,sep="\t")
+names(In_Buildings_df)[1] <- "Type"     # Type of building
+names(In_Buildings_df)[2] <- "x"        # x coord - lower left corner of square (i.e. standard grid coordinate system)
+names(In_Buildings_df)[3] <- "y"        # y coord
+names(In_Buildings_df)[4] <- "Value"    # Value of building
+# Add +0.5 to each location to put them in the cetre of the squares
+In_Buildings_df[,"x"] <- In_Buildings_df[,"x"] + 0.5
+In_Buildings_df[,"y"] <- In_Buildings_df[,"y"] + 0.5
+# Add a building ID column
+In_Buildings_df$ID <- seq.int(nrow(In_Buildings_df))
+# Force Type column to be strings
+In_Buildings_df$Type <- as.character(In_Buildings_df$Type)
+
+#### [4] generate random numbers to determine event locations
+
+for(i in 1:YEARS) 
+{
+  Event_locn_df[i,"Year"] <- i   # Year
+  Event_locn_df[i,"x"] <- trunc(runif(1,X_min,X_max +1))  # Leave the +1 in
+  Event_locn_df[i,"y"] <- trunc(runif(1,Y_min,Y_max +1))  # it's to do with how trun() creates whole numbers
+}
+
+#### [5] generate random numbers to replicate 'rolling 2 dice'
+# in order to set the magnitude of the event
+# Roll 2 dice
+for(i in 1:YEARS) 
+{
+  Event_locn_df[i,"d1"] <- trunc(runif(1)*SIDES_d1)+1
+  Event_locn_df[i,"d2"] <- trunc(runif(1)*SIDES_d2)+1
+}
+# Convert this to magnitudes
+Event_locn_df["M"] <- Event_locn_df["d1"]+Event_locn_df["d2"]
+# Using the information on your sheet, convert this to a spatial scale for the event
+# x scale
+Event_locn_df$Dx <- ifelse(Event_locn_df$M < 5, 0, NA)
+Event_locn_df$Dx <- ifelse(Event_locn_df$M >= 5 & Event_locn_df$M <= 7, 4, Event_locn_df$Dx)
+Event_locn_df$Dx <- ifelse(Event_locn_df$M >= 8 & Event_locn_df$M <= 10, 5, Event_locn_df$Dx)
+Event_locn_df$Dx <- ifelse(Event_locn_df$M >= 11, 5, Event_locn_df$Dx)
+# y scale
+Event_locn_df$Dy <- ifelse(Event_locn_df$M < 5, 0, NA)
+Event_locn_df$Dy <- ifelse(Event_locn_df$M >= 5 & Event_locn_df$M <= 7, 1, Event_locn_df$Dy)
+Event_locn_df$Dy <- ifelse(Event_locn_df$M >= 8 & Event_locn_df$M <= 9, 2, Event_locn_df$Dy)
+Event_locn_df$Dy <- ifelse(Event_locn_df$M >= 10, 3, Event_locn_df$Dy)
+# And, finally get the limits of the event
+Event_locn_df$Lx <- Event_locn_df$x - Event_locn_df$Dx
+Event_locn_df$Rx <- Event_locn_df$x + Event_locn_df$Dx
+Event_locn_df$Ly <- Event_locn_df$y - Event_locn_df$Dy
+Event_locn_df$Uy <- Event_locn_df$y + Event_locn_df$Dy
+
+
+#### [6] Add in details of a single specific building of interest
+# e.g. a new suite of offices at (6,7) with value of 8 million
+n_existing <- nrow(In_Buildings_df)
+row_new <- n_existing +1
+In_Buildings_df[row_new,"Type"] <- as.character("Office")
+In_Buildings_df[row_new,"x"] <- 6.5  # Don't forget the 0.5 to put it in the cetre of the square
+In_Buildings_df[row_new,"y"] <- 7.5
+In_Buildings_df[row_new,"Value"] <- 8      # Put this to zero to effectively remove this additional building from the analysis
+In_Buildings_df[row_new,"ID"] <- row_new
+
+#### [7] For each event (rows) work out if each building (columns) was affected
+# and record the amount of damage. The sum these for each year (i.e. event).
+
+# Set up the data frame
+n_buildings <- nrow(In_Buildings_df)
+Table_loss_df <- as.data.frame(matrix(nrow = YEARS, ncol = n_buildings))
+Event_loss_df <- as.data.frame(matrix(nrow = YEARS, ncol = 1))
+
+# Do the loop, for each building for each event
+# working out if it's damaged
+for(i in 1:YEARS) 
+{
+  for(j in 1:n_buildings) 
+    {
+    # Loss for building j for year i
+    Table_loss_df[i,j] <- ifelse(In_Buildings_df[j,"x"] > Event_locn_df[i,"Lx"] & In_Buildings_df[j,"x"] < Event_locn_df[i,"Rx"] & In_Buildings_df[j,"y"] > Event_locn_df[i,"Ly"] & In_Buildings_df[j,"y"] < Event_locn_df[i,"Uy"],In_Buildings_df[j,"Value"] ,0)
+    }
+  # And adding up add the buildings for year i
+  Event_loss_df[i,1] <- sum(Table_loss_df[i,1:n_buildings])
+}
+
+
+#### [8] Plot a histogram of the losses
+
+# This is a visual check on how reasonable results are.
+names(Event_loss_df)[1] <- "Loss"
+
+# Mainly defaults are sensible in choosing bin widths
+# But you may need to force the breaks (i.e. divisions between bins) explicitly
+
+# Or prefer to only look at non-zero losses, or losses greater than a give value
+hist(Event_loss_df$Loss)   
+#hist(Event_loss_df$Loss, breaks = c(5,15,25,35,45,55,65,75,85,95,105,115,125,135,145,155))
+#hist(subset(Event_loss_df$Loss, Event_loss_df$Loss > 20))   
+
+
+#### [9] Outputs - write to file
+
+# Input data
+cat(sprintf("## Asset locations used"),file=param_f,sep="\n")
+cat(sprintf("In_Buildings %s",In_Buildings),file=param_f,sep="\n",append=TRUE)
+cat(sprintf(""),file=param_f,sep="\n",append=TRUE)
+
+# Parameters
+cat(sprintf("## Parameters used"),file=param_f,sep="\n",append=TRUE)
+cat(sprintf("YEARS %d",YEARS),file=param_f,sep="\n",append=TRUE)
+cat(sprintf("SIDES_d1 %d",SIDES_d1),file=param_f,sep="\n",append=TRUE)
+cat(sprintf("SIDES_d2 %d",SIDES_d2),file=param_f,sep="\n",append=TRUE)
+cat(sprintf("Y_min %d Y_max %d",Y_min,Y_max),file=param_f,sep="\n",append=TRUE)
+cat(sprintf("X_min %d X_max %d",X_min,X_max),file=param_f,sep="\n",append=TRUE)
+cat(sprintf(""),file=param_f,sep="\n",append=TRUE)
+
+# Other elements of set up
+cat(sprintf("## Also remember"),file=param_f,sep="\n",append=TRUE)
+cat(sprintf("# Size-magnitude information in setction ####[5]"),file=param_f,sep="\n",append=TRUE)
+cat(sprintf("# That extra, important building section ####[6]"),file=param_f,sep="\n",append=TRUE)
+
+# Data
+write.table(Event_loss_df[,],file=dat1_out_f,col.names=F, row.names = F)
+
