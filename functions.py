@@ -263,7 +263,7 @@ def plot_convergence_of_exceedence(exceedence_probabilities, std_exceedence_prob
     plt.close()
 
 
-    def simul_for_setup(relocation: bool, buiseness_park_cords: str, props_of_interest: list, samplesize: int):
+def simul_for_setup(relocation: bool, buiseness_park_cords: str, props_of_interest: list, samplesize: int):
         #function to run the simulation for a given setup, it takes the same parameters as the main function and runs the simulation for the specified number of iterations, it also plots the results and saves them to the results directory. This function can be used to easily run the simulation for different setups by just calling this function with different parameters.
         
     #filestructure for the simulation
