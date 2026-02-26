@@ -80,11 +80,11 @@ def plot_histogram(losslist, title='Histogram of Losses', bins=50, keepzeros=Tru
                                   color='#3498db', edgecolor='#2c3e50', linewidth=1.2)
     # Add mean and median lines
     plt.axvline(mean_val, color='#e74c3c', linestyle='--', linewidth=1, 
-                label=f'Mean: {mean_val:,.0f}M$')
+                label=f'AAL: {mean_val:,.0f}M$')
 
     # Add shaded region for SEM around mean
     plt.axvspan(mean_val - sem_val, mean_val + sem_val, alpha=0.4, color='#e74c3c', 
-                label=f'Standard error of mean: ±M${sem_val:,.1f}')
+                label=f'Standard error of AAL: ±M${sem_val:,.1f}')
     
 
     
@@ -102,29 +102,30 @@ def plot_histogram(losslist, title='Histogram of Losses', bins=50, keepzeros=Tru
     #plt.show()
     plt.close()
 
-def plot_convergence(mean_loss_list, std_of_mean_loss_list, title='Convergence of Mean Losses', outdirectory="./results/"):
+def plot_convergence(mean_loss_list, std_of_mean_loss_list, title='Convergence of Average Annual Loss (AAL)', outdirectory="./results/"):
     
     #takes a list of mean values and a list of standard errors of the mean, and plots the convergence of the mean values with a shaded area representing the standard error of the mean.
     #The plot is saved to the results directory with a filename derived from the title.
     
     #the central limit theorem states that the distribution of the sample mean will approach a normal distribution as the sample size increases, regardless of the shape of the population distribution. This means that as we increase the number of simulations, the mean loss should converge to a stable value, and the standard error of the mean should decrease, indicating that our estimate of the mean loss is becoming more precise.
     plt.figure(figsize=(10, 6))
-    plt.plot(mean_loss_list, label='Mean Loss', color='#3498db')
+    plt.plot(mean_loss_list, label='AAL', color='#3498db')
     plt.fill_between(range(len(mean_loss_list)), 
                      np.array(mean_loss_list) - np.array(std_of_mean_loss_list), 
                      np.array(mean_loss_list) + np.array(std_of_mean_loss_list), 
-                     color='#3498db', alpha=0.2, label='Standard Error of Mean (68% Confidence Interval)')
+                     color='#3498db', alpha=0.2, label='Standard Error of AAL (68% Confidence Interval)')
     
     plt.fill_between(range(len(mean_loss_list)), 
                      np.array(mean_loss_list) - 2*np.array(std_of_mean_loss_list), 
                      np.array(mean_loss_list) + 2*np.array(std_of_mean_loss_list), 
-                     color="#eb0808", alpha=0.1, label='Standard Error of Mean (95% Confidence Interval)')
+                     color="#eb0808", alpha=0.1, label='Standard Error of AAL (95% Confidence Interval)')
     #making sure the axes are readable
-    labellist = range(0, len(mean_loss_list), len(mean_loss_list)//10)
+    step = max(len(mean_loss_list)//10, 1)
+    labellist = range(0, len(mean_loss_list), step)
     # Styling
     plt.xlabel('Number of Simulations [k]', fontsize=14, fontweight='bold')
-    plt.ylabel('Mean Loss (Million $)', fontsize=14, fontweight='bold')
-    plt.xticks(labellist, [f"{x//1000}" for x in labellist])
+    plt.ylabel('AAL (Million $)', fontsize=14, fontweight='bold')
+    plt.xticks(labellist, [f"{x/1000:.1f}" for x in labellist])
     plt.title(title, fontsize=16, fontweight='bold', pad=20)
     plt.grid(True, alpha=0.3, linestyle='--', linewidth=0.8)
     plt.legend(fontsize=11, framealpha=0.9)
@@ -230,7 +231,7 @@ def analyse_conditional_probaility(losslist: list, typelist: list, type_of_inter
     plt.savefig(outdirectory + filename + ".png", dpi=300)
     plt.close()
 
-def plot_convergence_of_exceedence(exceedence_probabilities, std_exceedence_probabilities, title='Convergence of Exceedence Probability', outdirectory="./results/"):
+def plot_convergence_of_exceedence(exceedence_probabilities, std_exceedence_probabilities, title='Convergence of Occurrence Exceedence Probability (120M$)', outdirectory="./results/"):
     
     #takes a list of exceedence probabilities and a list of standard errors of the exceedence probabilities, and plots the convergence of the exceedence probabilities with a shaded area representing the standard error.
     #The plot is saved to the results directory with a filename derived from the title.
@@ -248,11 +249,13 @@ def plot_convergence_of_exceedence(exceedence_probabilities, std_exceedence_prob
                      np.array(exceedence_probabilities) + 2*np.array(std_exceedence_probabilities), 
                      color="#eb0808", alpha=0.1, label='Standard Error of Exceedence Probability (95% Confidence Interval)')
     #making sure the axes are readable
-    labellist = range(0, len(exceedence_probabilities), len(exceedence_probabilities)//10)
+    step = max(len(exceedence_probabilities)//10, 1)
+    labellist = range(0, len(exceedence_probabilities), step)
     # Styling
+    plt.ylim(0, 1)
     plt.xlabel('Number of Simulations [k]', fontsize=14, fontweight='bold')
     plt.ylabel('Exceedence Probability', fontsize=14, fontweight='bold')
-    plt.xticks(labellist, [f"{x//1000}" for x in labellist])
+    plt.xticks(labellist, [f"{x/1000:.1f}" for x in labellist])
     plt.title(title, fontsize=16, fontweight='bold', pad=20)
     plt.grid(True, alpha=0.3, linestyle='--', linewidth=0.8)
     plt.legend(fontsize=11, framealpha=0.9)
@@ -283,12 +286,12 @@ def simul_for_setup(relocation: bool, buiseness_park_cords: str, props_of_intere
     if buiseness_park_cords == "A":
         props_normal_df = props_normal_df._append({"Type": "Buisness Park", "x": 1, "y": 12, "value": 120, "Cords": (1, 12)}, ignore_index=True)
         props_relocation_df = props_relocation_df._append({"Type": "Buisness Park", "x": 1, "y": 12, "value": 120, "Cords": (1, 12)}, ignore_index=True)
-        print("Buisness Park added at coordinates (1, 12) with value 120.")
+        #print("Buisness Park added at coordinates (1, 12) with value 120.")
         buiseness_park = True
     elif buiseness_park_cords == "B":
         props_normal_df = props_normal_df._append({"Type": "Buisness Park", "x": 5, "y": 6, "value": 60, "Cords": (5, 6)}, ignore_index=True)
         props_relocation_df = props_relocation_df._append({"Type": "Buisness Park", "x": 5, "y": 6, "value": 60, "Cords": (5, 6)}, ignore_index=True)
-        print("Buisness Park added at coordinates (5, 6) with value 60.")
+        #print("Buisness Park added at coordinates (5, 6) with value 60.")
         buiseness_park = True
     else:
         buiseness_park = False
@@ -317,16 +320,17 @@ def simul_for_setup(relocation: bool, buiseness_park_cords: str, props_of_intere
         p_exc = np.mean(np.array(losses) > 120)
         exceedence_probabilities.append(p_exc)
         std_exceedence_probabilities.append(np.sqrt(p_exc * (1 - p_exc) / len(losses)))
-
+        if i % (samplesize // 10) == 0 and i > 0:
+            print(f"Simulation progress: {i/samplesize:.1%}")
     #title = f"Histogram of losses for {'relocation' if relocation else 'normal'} scenario {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}"
 
     #plotting the results
     plot_histogram(losses, title=f"Histogram of losses for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}", keepzeros=True)
     plot_histogram(losses, title=f"Histogram of losses for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}", keepzeros=False)
-    plot_convergence(loss_mean, loss_mean_std, title=f"Convergence of mean losses for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}")
+    plot_convergence(loss_mean, loss_mean_std, title=f"Convergence of Average Annual Losses (AAL) for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}")
     plot_occurence_exceedence(losses, title=f"Occurrence exceedence for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}")
     andprob, orprob, houseprob = get_conditional_probability(losses, types_events, props_of_interest, cutoff=240, housecutoff=3)
-    print(f"Conditional probability of an event affecting {props_of_interest} given that there is a loss: {andprob:.4f}")
+    #print(f"Conditional probability of an event affecting {props_of_interest} given that there is a loss: {andprob:.4f}")
     analyse_conditional_probaility(losses, types_events, props_of_interest)
     plot_convergence_of_exceedence(exceedence_probabilities, std_exceedence_probabilities, title=f"Convergence of exceedence probability for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}")
     return losses, types_events, loss_mean, loss_mean_std, exceedence_probabilities, std_exceedence_probabilities
