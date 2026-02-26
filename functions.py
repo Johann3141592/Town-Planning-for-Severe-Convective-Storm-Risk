@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 #filestructure for the simulation
 setupdirectory = "./Setup-Files/"
@@ -328,3 +329,4 @@ def simul_for_setup(relocation: bool, buiseness_park_cords: str, props_of_intere
     print(f"Conditional probability of an event affecting {props_of_interest} given that there is a loss: {andprob:.4f}")
     analyse_conditional_probaility(losses, types_events, props_of_interest)
     plot_convergence_of_exceedence(exceedence_probabilities, std_exceedence_probabilities, title=f"Convergence of exceedence probability for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}")
+    return losses, types_events, loss_mean, loss_mean_std, exceedence_probabilities, std_exceedence_probabilities

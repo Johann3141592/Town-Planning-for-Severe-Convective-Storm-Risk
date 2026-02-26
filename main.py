@@ -13,68 +13,18 @@ import numpy as np
 import pandas as pd
 import random as random
 import datetime as dt
-from functions import get_scs_chords, calculate_damage, plot_histogram, plot_convergence, plot_occurence_exceedence, get_conditional_probability, analyse_conditional_probaility, plot_convergence_of_exceedence
+from functions import get_scs_chords, calculate_damage, plot_histogram, plot_convergence, plot_occurence_exceedence, get_conditional_probability, analyse_conditional_probaility, plot_convergence_of_exceedence, simul_for_setup
 
+summary = pd.DataFrame(columns=["Scenario", "Buiseness Park", "Mean Loss", "Std Loss", "Exceedence Probability", "Std Exceedence Probability"])
+summary_list = []
+for relocation in [True, False]:
+    for buiseness_park in ["A", "B", False]:
+        print(f"Running simulation for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}")
+        #running the simulation for the current setup
+        results = simul_for_setup(relocation, buiseness_park,props_of_interest=props_of_interest, samplesize=samplesize)
+        losses, types_events, loss_mean, loss_mean_std, exceedence_probabilities, std_exceedence_probabilities = results
+        summary_list.append({"Scenario": "Relocation" if relocation else "Normal", "Buiseness Park": f"Location {buiseness_park_cords}" if buiseness_park else "No Buiseness Park", "Mean Loss": loss_mean[-1], "Std Loss": loss_mean_std[-1], "Exceedence Probability": exceedence_probabilities[-1], "Std Exceedence Probability": std_exceedence_probabilities[-1]})
 
-#filestructure for the simulation
-setupdirectory = "./Setup-Files/"
-outdirectory = "./results/"
+summary = pd.concat([summary, pd.DataFrame(summary_list)], ignore_index=True)
 
-#getting prop cords and values into a dataframe
-props_normal_df = pd.read_csv(setupdirectory + "Buildings_FL_E_1.2_2026.txt", sep="\s+", header=None, engine='python')
-props_normal_df = props_normal_df.rename(columns={0: "Type", 1: "x", 2: "y", 3: "value"})
-props_normal_df["Cords"] = list(zip(props_normal_df.x, props_normal_df.y))
-props_relocation_df = pd.read_csv(setupdirectory + "Buildings_FL_F_1.3_2026.txt", sep="\s+", header=None, engine='python')
-props_relocation_df = props_relocation_df.rename(columns={0: "Type", 1: "x", 2: "y", 3: "value"})
-props_relocation_df["Cords"] = list(zip(props_relocation_df.x, props_relocation_df.y))
-
-#adding buisness park coordinates to dataframe
-if buiseness_park_cords == "A":
-    props_normal_df = props_normal_df._append({"Type": "Buisness Park", "x": 1, "y": 12, "value": 120, "Cords": (1, 12)}, ignore_index=True)
-    props_relocation_df = props_relocation_df._append({"Type": "Buisness Park", "x": 1, "y": 12, "value": 120, "Cords": (1, 12)}, ignore_index=True)
-    print("Buisness Park added at coordinates (1, 12) with value 120.")
-    buiseness_park = True
-elif buiseness_park_cords == "B":
-    props_normal_df = props_normal_df._append({"Type": "Buisness Park", "x": 5, "y": 6, "value": 60, "Cords": (5, 6)}, ignore_index=True)
-    props_relocation_df = props_relocation_df._append({"Type": "Buisness Park", "x": 5, "y": 6, "value": 60, "Cords": (5, 6)}, ignore_index=True)
-    print("Buisness Park added at coordinates (5, 6) with value 60.")
-    buiseness_park = True
-else:
-    buiseness_park = False
-
-#running the simulation
-if relocation:
-    df = props_relocation_df
-else:
-    df = props_normal_df
-
-losses = []
-types_events = []
-loss_mean = []
-loss_mean_std = []
-exceedence_probabilities = []
-std_exceedence_probabilities = []
-
-#main loop for the simulation, it runs for the number of minutes specified in the samplesize variable. In each iteration, it gets the coordinates of the severe convective storm, calculates the damage and appends the loss and event type to the respective lists. It also calculates the mean and standard deviation of the losses after each iteration for convergence analysis.
-for i in range(samplesize):
-    scs_cords = get_scs_chords()
-    loss, event_type = calculate_damage(scs_cords,  df)
-    losses.append(loss)
-    types_events.append(event_type)
-    loss_mean.append(np.mean(losses))
-    loss_mean_std.append(np.std(losses))
-    p_exc = np.mean(np.array(losses) > 120)
-    exceedence_probabilities.append(p_exc)
-    std_exceedence_probabilities.append(np.sqrt(p_exc * (1 - p_exc) / len(losses)))
-
-#title = f"Histogram of losses for {'relocation' if relocation else 'normal'} scenario {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}"
-
-#plotting the results
-plot_histogram(losses, title=f"Histogram of losses for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}", keepzeros=True)
-plot_histogram(losses, title=f"Histogram of losses for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}", keepzeros=False)
-plot_convergence(loss_mean, loss_mean_std, title=f"Convergence of mean losses for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}")
-plot_occurence_exceedence(losses, title=f"Occurrence exceedence for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}")
-andprob, orprob, houseprob = get_conditional_probability(losses, types_events, props_of_interest, cutoff=240, housecutoff=3)
-print(f"Conditional probability of an event affecting {props_of_interest} given that there is a loss: {andprob:.4f}")
-analyse_conditional_probaility(losses, types_events, props_of_interest)
-plot_convergence_of_exceedence(exceedence_probabilities, std_exceedence_probabilities, title=f"Convergence of exceedence probability for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}")
+summary.to_excel("./results/summary.xlsx", index=False)
