@@ -6,7 +6,8 @@
 
 #configuration for the simulation
 samplesize = 100000 #number of minutes the simulation should run for
-props_of_interest = ["Buiseness Park"] #This is what property is of intered for conditional probabilities
+
+props_of_interest = ["Buisness Park"] #This is what property is of intered for conditional probabilities
 #getting the necessary libraries
 import matplotlib.pyplot as plt
 import numpy as np

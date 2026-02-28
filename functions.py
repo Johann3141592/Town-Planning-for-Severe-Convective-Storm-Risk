@@ -156,17 +156,22 @@ def get_conditional_probability(losslist: list, typelist: list, type_of_interest
 
     boollist = losslist > cutoff
     typelist_after_cutoff = typelist[boollist]
-
+    
     #and condition: all types of interest must be involved
     counterand = 0
     for destr_props in typelist_after_cutoff:
-        if all(proptype in destr_props for proptype in type_of_interest):
+        # Strip whitespace from property types for comparison
+        destr_props_clean = [prop.strip() for prop in destr_props]
+        type_of_interest_clean = [prop.strip() for prop in type_of_interest]
+        if all(proptype in destr_props_clean for proptype in type_of_interest_clean):
             counterand += 1
 
     #or condition: at least one type of interest must be involved
     counteror = 0
     for destr_props in typelist_after_cutoff:
-        if any(proptype in destr_props for proptype in type_of_interest):
+        destr_props_clean = [prop.strip() for prop in destr_props]
+        type_of_interest_clean = [prop.strip() for prop in type_of_interest]
+        if any(proptype in destr_props_clean for proptype in type_of_interest_clean):
             counteror += 1
     
     #conditional probabilities that houses (more than cutoff) are involved
@@ -217,7 +222,19 @@ def plot_occurence_exceedence(losslist, title="Occurence Exceedence Plot", outdi
     plt.savefig(outdirectory + filename + ".png", dpi=300)
     plt.close()
 
-def analyse_conditional_probaility(losslist: list, typelist: list, type_of_interest:list,):
+def analyse_conditional_probaility(losslist: list, typelist: list, type_of_interest:list, relocation: bool, buiseness_park_cords: str, outdirectory="./results/"):
+    if not buiseness_park_cords:
+        return
+    
+    # Debug: Check if business park is ever destroyed
+    bp_destroyed_count = 0
+    for event_types in typelist:
+        for prop_type in event_types:
+            if prop_type.strip() == type_of_interest[0].strip():
+                bp_destroyed_count += 1
+                break
+    #print(f"Business Park destroyed in {bp_destroyed_count} out of {len(typelist)} events ({bp_destroyed_count/len(typelist)*100:.2f}%)")
+    
     #analysing conditional probability for different cutoffs
     cutoffs = []
     andprobs = []
@@ -231,12 +248,12 @@ def analyse_conditional_probaility(losslist: list, typelist: list, type_of_inter
         cutoffs.append(cutoff)
     plt.figure(figsize=(10, 6))
     plt.plot(cutoffs, andprobs, color='#3498db')
-    plt.title(f"Conditional Probability of a loss given that \n the {type_of_interest[0]} is destroyed ", fontsize=16, fontweight='bold', pad=20)
+    plt.title(f"Conditional Probability of a loss given that \n the {type_of_interest[0]} in location {buiseness_park_cords} is destroyed in {'relocation' if relocation else 'normal'} scenario", fontsize=16, fontweight='bold', pad=20)
     plt.xlabel("Loss (Million $)", fontsize=14, fontweight='bold')
     plt.ylabel("Conditional Probability", fontsize=14, fontweight='bold')
     plt.grid(True, alpha=0.3, linestyle='--', linewidth=0.8)
     plt.tight_layout()
-    filename = f"Conditional_Probability_{type_of_interest[0]}_Destroyed"
+    filename = f"Conditional_Probability_{type_of_interest[0]}_Destroyed_{'relocation' if relocation else 'normal'}_scenario_Location_{buiseness_park_cords}"
     plt.savefig(outdirectory + filename + ".png", dpi=300)
     plt.close()
 
@@ -292,7 +309,7 @@ def plot_property_map(df, relocation, buiseness_park, buiseness_park_cords, map_
         "Hot.": "Hot.",
         "Bank": "B",
         "Shop": "S",
-        "Buisness Park": "B",
+        "Buisness Park": "B. P.",
         "Dr": "Dr",
         "P.O.": "P.O.",
     }
@@ -389,9 +406,11 @@ def simul_for_setup(relocation: bool, buiseness_park_cords: str, props_of_intere
     #getting prop cords and values into a dataframe
     props_normal_df = pd.read_csv(setupdirectory + "Buildings_FL_E_1.2_2026.txt", sep="\s+", header=None, engine='python')
     props_normal_df = props_normal_df.rename(columns={0: "Type", 1: "x", 2: "y", 3: "value"})
+    props_normal_df["Type"] = props_normal_df["Type"].str.strip()  # Remove trailing whitespace
     props_normal_df["Cords"] = list(zip(props_normal_df.x, props_normal_df.y))
     props_relocation_df = pd.read_csv(setupdirectory + "Buildings_FL_F_1.3_2026.txt", sep="\s+", header=None, engine='python')
     props_relocation_df = props_relocation_df.rename(columns={0: "Type", 1: "x", 2: "y", 3: "value"})
+    props_relocation_df["Type"] = props_relocation_df["Type"].str.strip()  # Remove trailing whitespace
     props_relocation_df["Cords"] = list(zip(props_relocation_df.x, props_relocation_df.y))
 
     #adding buisness park coordinates to dataframe
@@ -448,7 +467,7 @@ def simul_for_setup(relocation: bool, buiseness_park_cords: str, props_of_intere
     plot_occurence_exceedence(losses, title=f"Occurrence exceedence for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}")
     andprob, orprob, houseprob = get_conditional_probability(losses, types_events, props_of_interest, cutoff=240, housecutoff=3)
     #print(f"Conditional probability of an event affecting {props_of_interest} given that there is a loss: {andprob:.4f}")
-    analyse_conditional_probaility(losses, types_events, props_of_interest)
+    analyse_conditional_probaility(losses, types_events, props_of_interest, relocation, buiseness_park_cords, outdirectory)
     plot_convergence_of_exceedence(exceedence_probabilities, std_exceedence_probabilities, title=f"Convergence of exceedence probability for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}")
     return losses, types_events, loss_mean, loss_mean_std, exceedence_probabilities, std_exceedence_probabilities
 
