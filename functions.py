@@ -1,7 +1,14 @@
+#This file contains all functions used in the simulation, it is imported in the main file and allows for a more organized code structure and easier readability. Each function has a specific purpose and can be easily reused throughout the code.
+
+#Author: Johann Posanski
+
 import random
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import pickle
+from PIL import Image
+
 
 #filestructure for the simulation
 setupdirectory = "./Setup-Files/"
@@ -210,13 +217,13 @@ def plot_occurence_exceedence(losslist, title="Occurence Exceedence Plot", outdi
     plt.savefig(outdirectory + filename + ".png", dpi=300)
     plt.close()
 
-def analyse_conditional_probaility(losslist: list, typelist: list, type_of_interest:list):
+def analyse_conditional_probaility(losslist: list, typelist: list, type_of_interest:list,):
     #analysing conditional probability for different cutoffs
     cutoffs = []
     andprobs = []
     orprobs = []
     houseprobs = []
-    for cutoff in range(0, 300, 10):
+    for cutoff in range(0, 300, 1):
         proband, probor, probhouse = get_conditional_probability(losslist, typelist, type_of_interest, cutoff=cutoff)
         andprobs.append(proband)
         orprobs.append(probor)
@@ -268,9 +275,112 @@ def plot_convergence_of_exceedence(exceedence_probabilities, std_exceedence_prob
     plt.savefig(outdirectory + filename + ".png", dpi=300)
     plt.close()
 
+def plot_property_map(df, relocation, buiseness_park, buiseness_park_cords, map_file="Map_FL_1.0_no_assets.eps"):
+    """
+    Plot properties on a map image based on their coordinates.
+    
+    Parameters:
+    df: DataFrame with columns 'Type', 'Cords', 'value'
+    relocation: Boolean indicating if relocation scenario is used
+    buiseness_park: Boolean indicating if business park is included
+    buiseness_park_cords: String indicating business park location ('A', 'B', or None)
+    map_file: Name of the map file to load from setupdirectory
+    """
+    # Defining what gets plotted for each type of property and the labels for the legend
+    abbreviation_map = {
+        "H": "H",
+        "Hot.": "Hot.",
+        "Bank": "B",
+        "Shop": "S",
+        "Buisness Park": "B",
+        "Dr": "Dr",
+        "P.O.": "P.O.",
+    }
+
+    label_map = {
+        "H": "House",
+        "Hot.": "Hotel",
+        "Bank": "Bank",
+        "Shop": "Shop",
+        "Buisness Park": "Business Park",
+        "Dr": "Drive",
+        "P.O.": "Post Office"
+    }
+    
+    # Create a copy to avoid modifying original dataframe
+    df_plot = df.copy()
+    
+    # Add abbreviation and label columns
+    df_plot["plot"] = df_plot["Type"].map(abbreviation_map)
+    df_plot["label"] = df_plot["Type"].map(label_map)
+    
+    # Load the map
+    img = Image.open(setupdirectory + map_file)
+    
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(12, 8))
+    #put the map as the ax element
+    ax.imshow(img)
+    
+    # Calculate step sizes for grid (found manually via trial and error to match the coordinates to the image)
+    stepsizex = (498 - 18) / 13
+    stepsizey = (494 - 27) / 13
+    
+    # Create coordinate-to-pixel mapping
+    chordpixs = {}
+    for i in range(1, 13):
+        for j in range(1, 13):
+            chordpixs[(i, j)] = (18 + i*stepsizex*0.96 - stepsizex/2, 27 + (13-j)*stepsizey + stepsizey/2)
+    
+    # Plot each property
+    for index, row in df_plot.iterrows():
+        x, y = row["Cords"]
+        if (x, y) in chordpixs:
+            pixel_x, pixel_y = chordpixs[(x, y)]
+            # Display only abbreviation
+            ax.text(pixel_x, pixel_y + 5, row['plot'], 
+                   color="black", fontsize=12, fontweight="bold", ha='center')
+    
+    # Create legend with abbreviation - full name and values
+    # For houses, use average value; for others, show unique values
+    legend_labels = []
+    
+    # Add houses with average value
+    houses = df_plot[df_plot['Type'] == 'H']
+    if not houses.empty:
+        avg_house_value = houses['value'].mean()
+        legend_labels.append(f"H - House (${avg_house_value:.1f}M avg)")
+    
+    # Add other property types with their unique values
+    other_props = df_plot[df_plot['Type'] != 'H'][['Type', 'plot', 'label', 'value']].drop_duplicates()
+    for _, row in other_props.iterrows():
+        legend_labels.append(f"{row['plot']} - {row['label']} (${row['value']}M)")
+    
+    ax.legend(handles=[plt.Line2D([0], [0], color='w', label=label,
+                          markerfacecolor='black', markersize=10) for label in legend_labels],
+              loc='center left', bbox_to_anchor=(1.02, 0.5), title='Property Types', 
+              prop={'size': 12},  # Normal weight for labels
+              title_fontproperties={'weight': 'bold', 'size': 12})  # Bold title
+    
+    # Add title
+    title = f"Property Map for {'relocation' if relocation else 'normal'} scenario {f'with business park in Location {buiseness_park_cords}' if buiseness_park else 'without business park'}"
+    ax.set_title(title, fontsize=14, fontweight='bold', pad=10, loc='left', x=0)
+    
+    # Set axis limits to image dimensions to eliminate whitespace
+    ax.set_xlim(0, img.size[0])
+    ax.set_ylim(img.size[1], 0)
+    ax.axis("off")
+    
+    # Create dynamic filename
+    scenario = "relocation" if relocation else "normal"
+    bp_suffix = f"_bp_{buiseness_park_cords}" if buiseness_park else "_no_bp"
+    filename = f"property_map_{scenario}{bp_suffix}.png"
+    
+    plt.savefig(outdirectory + filename, bbox_inches='tight', pad_inches=0.1)
+
 
 def simul_for_setup(relocation: bool, buiseness_park_cords: str, props_of_interest: list, samplesize: int):
-        #function to run the simulation for a given setup, it takes the same parameters as the main function and runs the simulation for the specified number of iterations, it also plots the results and saves them to the results directory. This function can be used to easily run the simulation for different setups by just calling this function with different parameters.
+    #function to run the whole simulation for a given setup, it takes the same parameters as the main function and runs the simulation for the specified number of iterations, it also plots the results and saves them to the results directory. This function can be used to easily run the simulation for different setups by just calling this function with different parameters.
         
     #filestructure for the simulation
     setupdirectory = "./Setup-Files/"
@@ -286,8 +396,8 @@ def simul_for_setup(relocation: bool, buiseness_park_cords: str, props_of_intere
 
     #adding buisness park coordinates to dataframe
     if buiseness_park_cords == "A":
-        props_normal_df = props_normal_df._append({"Type": "Buisness Park", "x": 1, "y": 12, "value": 240, "Cords": (1, 12)}, ignore_index=True)
-        props_relocation_df = props_relocation_df._append({"Type": "Buisness Park", "x": 1, "y": 12, "value": 240, "Cords": (1, 12)}, ignore_index=True)
+        props_normal_df = props_normal_df._append({"Type": "Buisness Park", "x": 1, "y": 12, "value": 120, "Cords": (1, 12)}, ignore_index=True)
+        props_relocation_df = props_relocation_df._append({"Type": "Buisness Park", "x": 1, "y": 12, "value": 120, "Cords": (1, 12)}, ignore_index=True)
         #print("Buisness Park added at coordinates (1, 12) with value 240.")
         buiseness_park = True
     elif buiseness_park_cords == "B":
@@ -310,6 +420,7 @@ def simul_for_setup(relocation: bool, buiseness_park_cords: str, props_of_intere
     loss_mean_std = []
     exceedence_probabilities = []
     std_exceedence_probabilities = []
+    plot_property_map(df, relocation, buiseness_park, buiseness_park_cords)
 
     #main loop for the simulation, it runs for the number of minutes specified in the samplesize variable. In each iteration, it gets the coordinates of the severe convective storm, calculates the damage and appends the loss and event type to the respective lists. It also calculates the mean and standard deviation of the losses after each iteration for convergence analysis.
     for i in range(samplesize):
@@ -325,6 +436,10 @@ def simul_for_setup(relocation: bool, buiseness_park_cords: str, props_of_intere
         if i % (samplesize // 10) == 0 and i > 0:
             print(f"Simulation progress for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}: {i/samplesize:.1%}")
     #title = f"Histogram of losses for {'relocation' if relocation else 'normal'} scenario {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}"
+
+    #saving raw data results to file
+    with open(outdirectory + "rawdata/" + f"{'relocation' if relocation else 'normal'}_{'bp_' + buiseness_park_cords if buiseness_park else 'no_bp'}.pkl", "wb") as f:
+        pickle.dump((losses, types_events, loss_mean, loss_mean_std, exceedence_probabilities, std_exceedence_probabilities), f)
 
     #plotting the results
     plot_histogram(losses, title=f"Histogram of losses for {'relocation' if relocation else 'normal'} scenario \n {f'with buiseness park in Location {buiseness_park_cords}' if buiseness_park else 'without buiseness park'}", keepzeros=True)

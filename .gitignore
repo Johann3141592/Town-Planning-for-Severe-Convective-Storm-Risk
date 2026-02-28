@@ -1,3 +1,8 @@
+#larger and old files
+./results/
+./oldcodestuff
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
