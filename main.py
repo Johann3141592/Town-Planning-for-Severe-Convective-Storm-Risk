@@ -15,11 +15,14 @@ import pandas as pd
 import random as random
 import time
 import pickle
+import os
+from pathlib import Path
 from multiprocessing import Pool
 from functions import get_scs_chords, calculate_damage, plot_histogram, plot_convergence, plot_occurence_exceedence, get_conditional_probability, analyse_conditional_probaility, plot_convergence_of_exceedence, simul_for_setup, simul_for_setup_multiplocessing, plot_property_map
 
 
-
+resultsfolder = Path("./results/")
+resultsfolder.mkdir(exist_ok=True)
 if __name__ == "__main__":
     #doing this is necessary to ensure that the multiprocessing code runs correctly on Windows
     simul_params = []
